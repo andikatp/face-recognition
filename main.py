@@ -18,8 +18,13 @@ async def lifespan(app: FastAPI):
     print("🤖 Booting System: Compiling Lightweight Liveness Engine...")
     try:
         # Force-load liveness model weights using a blank dummy target matrix
-        dummy_img = np.zeros((112, 112, 3), dtype=np.uint8)
-        DeepFace.extract_faces(img_path=dummy_img, anti_spoofing=True, enforce_detection=False)
+        dummy_img = np.zeros((224, 224, 3), dtype=np.uint8)
+        DeepFace.extract_faces(
+            img_path=dummy_img, 
+            anti_spoofing=True, 
+            enforce_detection=False,
+            detector_backend="opencv"
+        )
         print("✅ Liveness Engine pre-compiled successfully.")
     except Exception as e:
         print(f"⚠️ Initial cache warm-up notice: {str(e)}")
