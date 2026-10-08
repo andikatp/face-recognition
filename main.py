@@ -75,7 +75,7 @@ async def verify_face(file: UploadFile = File(...)):
         )
 
         if not face_objs:
-            return JSONResponse(status_code=200, content={"status": "rejected", "reason": "No face detected in frame."})
+            return JSONResponse(status_code=200, content={"status": "rejected", "message": "Tidak ada wajah yang terdeteksi."})
 
         # Extract primary localized face structure
         primary_face = face_objs[0]
@@ -83,7 +83,7 @@ async def verify_face(file: UploadFile = File(...)):
         # If confidence is very low, a face wasn't truly found
         confidence = primary_face.get("confidence", 0)
         if confidence < 0.5:
-             return JSONResponse(status_code=200, content={"status": "rejected", "reason": "No clear face detected."})
+             return JSONResponse(status_code=200, content={"status": "rejected", "message": "Wajah tidak terdeteksi dengan jelas."})
 
         is_real = primary_face.get("is_real", False)
         antispoof_score = float(primary_face.get("antispoof_score", 0.0))
@@ -93,7 +93,7 @@ async def verify_face(file: UploadFile = File(...)):
                 status_code=200, 
                 content={
                     "status": "rejected", 
-                    "reason": "Spoof attack blocked. Photo or digital screen detected."
+                    "message": "Verifikasi gagal. Foto palsu atau layar digital terdeteksi."
                 }
             )
 
@@ -101,14 +101,14 @@ async def verify_face(file: UploadFile = File(...)):
             status_code=200,
             content={
                 "status": "success",
-                "message": "Liveness validated successfully. Face is real.",
+                "message": "Verifikasi berhasil. Wajah asli terdeteksi.",
                 "antispoof_score": antispoof_score
             }
         )
 
     except ValueError as ve:
-        return JSONResponse(status_code=200, content={"status": "rejected", "reason": str(ve)})
+        return JSONResponse(status_code=200, content={"status": "rejected", "message": str(ve)})
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return JSONResponse(status_code=500, content={"status": "error", "message": "Internal server error during analysis."})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Terjadi kesalahan internal pada server saat analisis."})
