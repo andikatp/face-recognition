@@ -17,9 +17,9 @@ ENV PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir -r requirements.txt
 
 # DeepFace forces `opencv-python` which breaks on Linux without GUI libraries.
-# We uninstall it and replace it with the headless version.
-RUN pip uninstall -y opencv-python
-RUN pip install --no-cache-dir "opencv-python-headless<5.0.0"
+# We uninstall it and force-reinstall the headless version to fix the corrupted cv2 folder.
+RUN pip uninstall -y opencv-python opencv-python-headless
+RUN pip install --force-reinstall --no-cache-dir "opencv-python-headless<5.0.0"
 
 # Patch DeepFace so it doesn't crash asking for `tf-keras` on the newest TensorFlow
 RUN sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $(python -c "import os, deepface; print(os.path.join(os.path.dirname(deepface.__file__), 'commons', 'package_utils.py'))")
