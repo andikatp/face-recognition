@@ -32,26 +32,9 @@ app = FastAPI(title="Liveness Detection Engine", lifespan=lifespan)
 async def global_exception_handler(request: Request, exc: Exception):
     err = traceback.format_exc()
     print("GLOBAL EXCEPTION:", err)
-    
-    cv2_info = "unknown"
-    cv2_dir = []
-    try:
-        import cv2
-        cv2_info = getattr(cv2, '__file__', 'no_file')
-        cv2_dir = dir(cv2)
-    except Exception:
-        pass
-        
     return JSONResponse(
         status_code=500,
-        content={
-            "status": "error", 
-            "message": str(exc), 
-            "trace": err,
-            "cv2_file": cv2_info,
-            "cv2_dir_len": len(cv2_dir),
-            "cv2_dir_sample": cv2_dir[:50]
-        }
+        content={"status": "error", "message": str(exc), "trace": err}
     )
 
 @app.post("/api/v1/verify-face")
