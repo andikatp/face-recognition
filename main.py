@@ -1,9 +1,10 @@
 import os
 import cv2
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+import traceback
 
 # Suppress verbose TensorFlow logs
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3" 
@@ -27,10 +28,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Liveness Detection Engine", lifespan=lifespan)
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    err = traceback.format_exc()
+    print("GLOBAL EXCEPTION:", err)
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "message": str(exc), "trace": err}
+    )
+
 @app.post("/api/v1/verify-face")
 async def verify_face(file: UploadFile = File(...)):
     # 1. Enforce payload constraints
-    if not file.content_type.startswith("image/"):
+    if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid data type. Must submit a valid image format.")
     
     file_bytes = await file.read()
