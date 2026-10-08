@@ -21,6 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip uninstall -y opencv-python
 RUN pip install --no-cache-dir "opencv-python-headless<5.0.0"
 
+# Patch DeepFace so it doesn't crash asking for `tf-keras` on the newest TensorFlow
+RUN sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $(python -c "import os, deepface; print(os.path.join(os.path.dirname(deepface.__file__), 'commons', 'package_utils.py'))")
+
 # Copy the current directory contents into the container at /app
 COPY . .
 
