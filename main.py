@@ -58,12 +58,15 @@ async def verify_face(file: UploadFile = File(...)):
     if img is None:
         raise HTTPException(status_code=400, detail="Invalid image payload. Could not decode bytes.")
 
-    # 3. Downscale massive iPhone/Android photos to standard size
-    max_dimension = 800
+    # 3. CRITICAL OOM PREVENTION: Downscale massive iPhone/Android photos
+    max_dimension = 320
     h, w = img.shape[:2]
     if h > max_dimension or w > max_dimension:
         scaling_factor = max_dimension / float(max(h, w))
         img = cv2.resize(img, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
+
+    import gc
+    gc.collect()
 
     try:
         # 4. LIVENESS DETECTION ONLY
