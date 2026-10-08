@@ -1,9 +1,7 @@
 fastapi
 python-multipart
 uvicorn
-deepface[tensorflow]
+deepface
 opencv-python-headless<5.0.0
 numpy
-tensorflow
-pandas
-gradio==4.44.1
+tensorflow-cpu

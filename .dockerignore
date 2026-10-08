@@ -1,0 +1,13 @@
+venv/
+.git/
+.github/
+__pycache__/
+*.pyc
+*.pyo
+*.pkl
+employee_db/*.pkl
+.env
+.DS_Store
+*.md
+dummy.jpg
+main_full.py
