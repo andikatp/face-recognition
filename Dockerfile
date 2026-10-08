@@ -17,9 +17,9 @@ ENV TF_NUM_INTEROP_THREADS=1
 ENV TF_NUM_INTRAOP_THREADS=1
 
 # Install packages, replace OpenCV with headless, and patch DeepFace in a SINGLE layer to save space
-RUN pip install --no-cache-dir -r requirements.txt && \
+RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt && \
     pip uninstall -y opencv-python opencv-python-headless && \
-    pip install --no-cache-dir "opencv-python-headless<5.0.0" && \
+    pip install --default-timeout=1000 --no-cache-dir "opencv-python-headless<5.0.0" && \
     LOCATION=$(pip show deepface | awk '/^Location:/ {print $2}') && \
     sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $LOCATION/deepface/commons/package_utils.py && \
     find /usr/local/lib/python3.10/site-packages/ -name "__pycache__" -type d -exec rm -rf {} +
