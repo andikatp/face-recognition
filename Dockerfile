@@ -16,17 +16,13 @@ ENV TF_CPP_MIN_LOG_LEVEL=3
 ENV TF_NUM_INTEROP_THREADS=1
 ENV TF_NUM_INTRAOP_THREADS=1
 
-# Install Python packages
-RUN pip install --no-cache-dir -r requirements.txt
-
-# DeepFace forces `opencv-python` which breaks on Linux without GUI libraries.
-# We uninstall it and force-reinstall the headless version to fix the corrupted cv2 folder.
-RUN pip uninstall -y opencv-python opencv-python-headless
-RUN pip install --force-reinstall --no-cache-dir "opencv-python-headless<5.0.0"
-
-# Patch DeepFace so it doesn't crash asking for `tf-keras` on the newest TensorFlow
-RUN LOCATION=$(pip show deepface | awk '/^Location:/ {print $2}') && \
-    sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $LOCATION/deepface/commons/package_utils.py
+# Install packages, replace OpenCV with headless, and patch DeepFace in a SINGLE layer to save space
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip uninstall -y opencv-python opencv-python-headless && \
+    pip install --no-cache-dir "opencv-python-headless<5.0.0" && \
+    LOCATION=$(pip show deepface | awk '/^Location:/ {print $2}') && \
+    sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $LOCATION/deepface/commons/package_utils.py && \
+    find /usr/local/lib/python3.10/site-packages/ -name "__pycache__" -type d -exec rm -rf {} +
 
 # Copy the current directory contents into the container at /app
 COPY . .
