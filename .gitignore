@@ -1,0 +1,13 @@
+# Environments
+venv/
+.env
+
+# Python caches
+__pycache__/
+*.pyc
+
+# DeepFace cache files
+employee_db/*.pkl
+
+# OS files
+.DS_Store
