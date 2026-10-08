@@ -16,6 +16,11 @@ ENV PYTHONUNBUFFERED=1
 # Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
+# DeepFace forces `opencv-python` which breaks on Linux without GUI libraries.
+# We uninstall it and replace it with the headless version.
+RUN pip uninstall -y opencv-python
+RUN pip install --no-cache-dir "opencv-python-headless<5.0.0"
+
 # Copy the current directory contents into the container at /app
 COPY . .
 
