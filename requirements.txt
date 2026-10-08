@@ -2,7 +2,7 @@ fastapi
 python-multipart
 uvicorn
 deepface[tensorflow]
-opencv-python<5.0.0
+opencv-python-headless<5.0.0
 numpy
 tensorflow
 pandas
