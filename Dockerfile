@@ -12,6 +12,9 @@ COPY requirements.txt .
 # Optimize memory allocation for 512MB RAM (Render Free Tier)
 ENV MALLOC_ARENA_MAX=2
 ENV PYTHONUNBUFFERED=1
+ENV TF_CPP_MIN_LOG_LEVEL=3
+ENV TF_NUM_INTEROP_THREADS=1
+ENV TF_NUM_INTRAOP_THREADS=1
 
 # Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
@@ -22,7 +25,8 @@ RUN pip uninstall -y opencv-python opencv-python-headless
 RUN pip install --force-reinstall --no-cache-dir "opencv-python-headless<5.0.0"
 
 # Patch DeepFace so it doesn't crash asking for `tf-keras` on the newest TensorFlow
-RUN sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $(python -c "import os, deepface; print(os.path.join(os.path.dirname(deepface.__file__), 'commons', 'package_utils.py'))")
+RUN LOCATION=$(pip show deepface | awk '/^Location:/ {print $2}') && \
+    sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $LOCATION/deepface/commons/package_utils.py
 
 # Copy the current directory contents into the container at /app
 COPY . .
