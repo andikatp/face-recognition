@@ -13,9 +13,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -25,7 +22,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Multi-Arch Image
+      - name: Delete old tags to purge orphaned layers
+        run: |
+          TOKEN=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"username":"${{ secrets.DOCKERHUB_USERNAME }}","password":"${{ secrets.DOCKERHUB_TOKEN }}"}' \
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
+          # Delete 'latest' tag — forces a clean manifest on next push
+          curl -s -X DELETE \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "https://hub.docker.com/v2/repositories/andikatp/liveness-api/tags/latest/" || true
+
+      - name: Build and Push Image
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -33,3 +41,5 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: andikatp/liveness-api:latest
+          # Disable build cache so no stale layers are reused
+          no-cache: true
