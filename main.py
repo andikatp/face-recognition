@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
             img_path=dummy_img,
             anti_spoofing=True,
             enforce_detection=False,
-            detector_backend="skip"
+            detector_backend="opencv"
         )
         logger.info("✅ Liveness Engine pre-compiled successfully.")
     except Exception as e:
@@ -135,12 +135,12 @@ async def verify_face(
         logger.info(f"✨ Enhanced Brightness: {new_brightness:.2f}")
 
     try:
-        # 4. LIVENESS DETECTION ONLY (Using 'skip' to maximize speed)
+        # 4. LIVENESS DETECTION ONLY
         face_objs = DeepFace.extract_faces(
             img_path=img,
             anti_spoofing=True,
             enforce_detection=False,
-            detector_backend="skip"
+            detector_backend="opencv"
         )
 
         if not face_objs:
