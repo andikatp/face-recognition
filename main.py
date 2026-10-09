@@ -127,15 +127,22 @@ async def verify_face(
         if confidence < 0.5:
             return JSONResponse(status_code=200, content={"status": "rejected", "message": "Wajah tidak terdeteksi dengan jelas."})
 
-        is_real = primary_face.get("is_real", False)
-        antispoof_score = float(primary_face.get("antispoof_score", 0.0))
+        deepface_is_real = primary_face.get("is_real", False)
+        deepface_score = float(primary_face.get("antispoof_score", 0.0))
 
-        # DeepFace antispoof_score represents the confidence of the *predicted* class.
-        # If it predicts real (is_real=True), antispoof_score is the realness confidence.
-        # If the user passes a strict threshold (e.g. 0.9), and the confidence is lower (e.g. 0.77),
-        # we manually reject it.
-        if is_real and antispoof_score < threshold:
-            is_real = False
+        # Calculate a pure "realness" score (0.0 to 1.0)
+        # If deepface predicts real, its score is the realness confidence.
+        # If deepface predicts spoof, its score is the spoof confidence, so realness is 1 - score.
+        if deepface_is_real:
+            realness_score = deepface_score
+        else:
+            realness_score = 1.0 - deepface_score
+
+        # Now we apply your exact simple logic!
+        is_real = realness_score >= threshold
+        
+        # We override antispoof_score so the frontend always sees the pure "realness" percentage
+        antispoof_score = realness_score
 
         if not is_real:
             return JSONResponse(
