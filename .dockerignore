@@ -5,9 +5,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pkl
-employee_db/*.pkl
+employee_db/
 .env
 .DS_Store
 *.md
 dummy.jpg
-main_full.py

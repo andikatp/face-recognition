@@ -3,7 +3,7 @@
 #   Installs all Python dependencies and applies
 #   the DeepFace patch in an isolated layer.
 # ─────────────────────────────────────────────
-FROM --platform=linux/amd64 python:3.10-slim AS builder
+FROM --platform=linux/amd64 python:3.12-slim AS builder
 
 WORKDIR /install
 
@@ -25,18 +25,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
     find /opt/venv -name "*.pyc" -delete && \
     find /opt/venv -name "*.pyo" -delete && \
     # Explicitly ensure haarcascades are exactly where DeepFace expects them
-    mkdir -p /opt/venv/lib/python3.10/site-packages/cv2/data && \
-    curl -fsSL -o /opt/venv/lib/python3.10/site-packages/cv2/data/haarcascade_frontalface_default.xml \
-         https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml && \
-    curl -fsSL -o /opt/venv/lib/python3.10/site-packages/cv2/data/haarcascade_eye.xml \
-         https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_eye.xml
+    mkdir -p /opt/venv/lib/python3.12/site-packages/cv2/data && \
+    python -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml', '/opt/venv/lib/python3.12/site-packages/cv2/data/haarcascade_frontalface_default.xml')" && \
+    python -c "import urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_eye.xml', '/opt/venv/lib/python3.12/site-packages/cv2/data/haarcascade_eye.xml')"
 
 # ─────────────────────────────────────────────
 # Stage 2 — Runtime
 #   Minimal image: only the installed packages
 #   and application source code.
 # ─────────────────────────────────────────────
-FROM --platform=linux/amd64 python:3.10-slim AS runtime
+FROM --platform=linux/amd64 python:3.12-slim AS runtime
 
 WORKDIR /app
 
