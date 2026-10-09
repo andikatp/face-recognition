@@ -3,7 +3,7 @@ import os
 import traceback
 import cv2
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
@@ -54,7 +54,10 @@ async def health_check():
 
 
 @app.post("/api/v1/verify-face")
-async def verify_face(file: UploadFile = File(...)):
+async def verify_face(
+    file: UploadFile = File(...),
+    threshold: float = Form(0.6)
+):
     # 1. Enforce payload constraints
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid data type. Must submit a valid image format.")
@@ -79,6 +82,31 @@ async def verify_face(file: UploadFile = File(...)):
         scaling_factor = max_dimension / float(max(h, w))
         img = cv2.resize(img, None, fx=scaling_factor, fy=scaling_factor, interpolation=cv2.INTER_AREA)
 
+    # 3.5. BRIGHTNESS CHECK & AUTO-ENHANCEMENT
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    brightness = np.mean(gray)
+
+    # 1. Graceful Rejection: If the image is extremely dark, reject it early.
+    if brightness < 40:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "rejected",
+                "message": "Ruangan terlalu gelap. Silakan cari tempat yang lebih terang."
+            }
+        )
+
+    # 2. Auto-Enhancement: If it's moderately dark, enhance the contrast/brightness
+    if brightness < 90:
+        # Convert to LAB color space to modify just the Lightness channel
+        lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        cl = clahe.apply(l)
+        limg = cv2.merge((cl, a, b))
+        img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+
     try:
         # 4. LIVENESS DETECTION ONLY
         face_objs = DeepFace.extract_faces(
@@ -102,12 +130,21 @@ async def verify_face(file: UploadFile = File(...)):
         is_real = primary_face.get("is_real", False)
         antispoof_score = float(primary_face.get("antispoof_score", 0.0))
 
+        # DeepFace antispoof_score is the confidence of the *predicted* class.
+        # If is_real is False, antispoof_score represents the confidence that it is a spoof.
+        # In low light, it often falsely predicts spoof.
+        # We can override the rejection if the spoof confidence is below our custom threshold.
+        if threshold is not None and not is_real:
+            if antispoof_score < threshold:
+                is_real = True
+
         if not is_real:
             return JSONResponse(
                 status_code=200,
                 content={
                     "status": "rejected",
-                    "message": "Verifikasi gagal. Foto palsu atau layar digital terdeteksi."
+                    "message": "Verifikasi gagal. Foto palsu atau layar digital terdeteksi.",
+                    "antispoof_score": antispoof_score
                 }
             )
 

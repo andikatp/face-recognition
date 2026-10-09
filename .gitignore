@@ -11,3 +11,4 @@ employee_db/*.pkl
 
 # OS files
 .DS_Store
+dummy/
