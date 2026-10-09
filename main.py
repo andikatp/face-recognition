@@ -130,13 +130,12 @@ async def verify_face(
         is_real = primary_face.get("is_real", False)
         antispoof_score = float(primary_face.get("antispoof_score", 0.0))
 
-        # DeepFace antispoof_score is the confidence of the *predicted* class.
-        # If is_real is False, antispoof_score represents the confidence that it is a spoof.
-        # In low light, it often falsely predicts spoof.
-        # We can override the rejection if the spoof confidence is below our custom threshold.
-        if threshold is not None and not is_real:
-            if antispoof_score < threshold:
-                is_real = True
+        # DeepFace antispoof_score represents the confidence of the *predicted* class.
+        # If it predicts real (is_real=True), antispoof_score is the realness confidence.
+        # If the user passes a strict threshold (e.g. 0.9), and the confidence is lower (e.g. 0.77),
+        # we manually reject it.
+        if is_real and antispoof_score < threshold:
+            is_real = False
 
         if not is_real:
             return JSONResponse(
