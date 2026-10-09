@@ -58,6 +58,8 @@ async def verify_face(
     file: UploadFile = File(...),
     threshold: float = Form(0.6)
 ):
+    print(f"\n--- 📸 New Verification Request ---")
+    print(f"🎯 Target Threshold: {threshold}")
     # 1. Enforce payload constraints
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid data type. Must submit a valid image format.")
@@ -85,9 +87,11 @@ async def verify_face(
     # 3.5. BRIGHTNESS CHECK & AUTO-ENHANCEMENT
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     brightness = np.mean(gray)
+    print(f"💡 Image Brightness: {brightness:.2f}")
 
     # 1. Graceful Rejection: If the image is extremely dark, reject it early.
     if brightness < 40:
+        print("❌ Rejected: Image is too dark (< 40)")
         return JSONResponse(
             status_code=200,
             content={
@@ -98,6 +102,7 @@ async def verify_face(
 
     # 2. Auto-Enhancement: If it's moderately dark, enhance the contrast/brightness
     if brightness < 90:
+        print("🔧 Applying CLAHE Auto-Enhancement for low light...")
         # Convert to LAB color space to modify just the Lightness channel
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
@@ -106,6 +111,10 @@ async def verify_face(
         cl = clahe.apply(l)
         limg = cv2.merge((cl, a, b))
         img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+        
+        # Log the new brightness
+        new_brightness = np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
+        print(f"✨ Enhanced Brightness: {new_brightness:.2f}")
 
     try:
         # 4. LIVENESS DETECTION ONLY
@@ -129,6 +138,8 @@ async def verify_face(
 
         deepface_is_real = primary_face.get("is_real", False)
         deepface_score = float(primary_face.get("antispoof_score", 0.0))
+        
+        print(f"🤖 DeepFace Raw Output -> is_real: {deepface_is_real}, confidence: {deepface_score:.4f}")
 
         # Calculate a pure "realness" score (0.0 to 1.0)
         # If deepface predicts real, its score is the realness confidence.
@@ -138,8 +149,12 @@ async def verify_face(
         else:
             realness_score = 1.0 - deepface_score
 
+        print(f"🧮 Calculated Realness Score: {realness_score:.4f}")
+
         # Now we apply your exact simple logic!
         is_real = realness_score >= threshold
+        
+        print(f"⚖️ Final Decision -> Accepted: {is_real} (Needed: {threshold})")
         
         # We override antispoof_score so the frontend always sees the pure "realness" percentage
         antispoof_score = realness_score
@@ -168,3 +183,10 @@ async def verify_face(
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"status": "error", "message": "Terjadi kesalahan internal pada server saat analisis."})
+
+
+if __name__ == "__main__":
+    import uvicorn
+    # This allows you to just run `python main.py` directly to start the server!
+    print("🚀 Starting local development server...")
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
