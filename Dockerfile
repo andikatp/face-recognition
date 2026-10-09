@@ -32,6 +32,12 @@ FROM --platform=linux/amd64 python:3.10-slim AS runtime
 
 WORKDIR /app
 
+# Install system dependencies required by OpenCV (even headless needs some)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy installed packages from the builder stage
 COPY --from=builder /install/deps /usr/local
 
