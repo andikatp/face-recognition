@@ -10,18 +10,20 @@ WORKDIR /install
 # Copy only the dependency manifest first (better layer caching)
 COPY requirements.txt .
 
-# Upgrade pip, install everything into a dedicated prefix, then patch DeepFace
+# Create a virtual environment and make it the default
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip, install everything, then patch DeepFace
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --default-timeout=1000 \
-        --prefix=/install/deps \
-        -r requirements.txt && \
+    pip install --no-cache-dir --default-timeout=1000 -r requirements.txt && \
     LOCATION=$(pip show --path deepface 2>/dev/null | head -1 || \
                python -c "import deepface, os; print(os.path.dirname(deepface.__file__) + '/..')") && \
-    PATCH_FILE=$(find /install/deps -path "*/deepface/commons/package_utils.py" | head -1) && \
+    PATCH_FILE=$(find /opt/venv -path "*/deepface/commons/package_utils.py" | head -1) && \
     sed -i '/def validate_for_keras3() -> None:/a\    return' "$PATCH_FILE" && \
-    find /install/deps -name "__pycache__" -type d -exec rm -rf {} + && \
-    find /install/deps -name "*.pyc" -delete && \
-    find /install/deps -name "*.pyo" -delete
+    find /opt/venv -name "__pycache__" -type d -exec rm -rf {} + && \
+    find /opt/venv -name "*.pyc" -delete && \
+    find /opt/venv -name "*.pyo" -delete
 
 # ─────────────────────────────────────────────
 # Stage 2 — Runtime
@@ -39,8 +41,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from the builder stage
-COPY --from=builder /install/deps /usr/local
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Activate virtual environment in runtime
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source (excludes whatever is in .dockerignore)
 COPY . .
