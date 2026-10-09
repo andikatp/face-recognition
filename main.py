@@ -47,6 +47,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+@app.get("/")
+async def root():
+    """Root endpoint to check if the API is online."""
+    return {"message": "Welcome to Liveness Detection Engine API", "status": "running"}
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Render and uptime monitors."""
