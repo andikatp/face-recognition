@@ -1,33 +1,52 @@
-# Use an official Python runtime as a parent image
-FROM --platform=linux/amd64 python:3.10-slim
+# ─────────────────────────────────────────────
+# Stage 1 — Builder
+#   Installs all Python dependencies and applies
+#   the DeepFace patch in an isolated layer.
+# ─────────────────────────────────────────────
+FROM --platform=linux/amd64 python:3.10-slim AS builder
 
-# Set the working directory in the container
-WORKDIR /app
+WORKDIR /install
 
-# (No apt-get needed because we will use opencv-python-headless)
-
-# Copy the requirements file into the container
+# Copy only the dependency manifest first (better layer caching)
 COPY requirements.txt .
 
-# Optimize memory allocation for 512MB RAM (Render Free Tier)
-ENV MALLOC_ARENA_MAX=2
-ENV PYTHONUNBUFFERED=1
-ENV TF_CPP_MIN_LOG_LEVEL=3
-ENV TF_NUM_INTEROP_THREADS=1
-ENV TF_NUM_INTRAOP_THREADS=1
-
-# Upgrade pip, install packages, and patch DeepFace in a SINGLE layer to save space
+# Upgrade pip, install everything into a dedicated prefix, then patch DeepFace
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --default-timeout=1000 --no-cache-dir -r requirements.txt && \
-    LOCATION=$(pip show deepface | awk '/^Location:/ {print $2}') && \
-    sed -i '/def validate_for_keras3() -> None:/a \ \ \ \ return' $LOCATION/deepface/commons/package_utils.py && \
-    find /usr/local/lib/python3.10/site-packages/ -name "__pycache__" -type d -exec rm -rf {} +
+    pip install --no-cache-dir --default-timeout=1000 \
+        --prefix=/install/deps \
+        -r requirements.txt && \
+    LOCATION=$(pip show --path deepface 2>/dev/null | head -1 || \
+               python -c "import deepface, os; print(os.path.dirname(deepface.__file__) + '/..')") && \
+    PATCH_FILE=$(find /install/deps -path "*/deepface/commons/package_utils.py" | head -1) && \
+    sed -i '/def validate_for_keras3() -> None:/a\    return' "$PATCH_FILE" && \
+    find /install/deps -name "__pycache__" -type d -exec rm -rf {} + && \
+    find /install/deps -name "*.pyc" -delete && \
+    find /install/deps -name "*.pyo" -delete
 
-# Copy the current directory contents into the container at /app
+# ─────────────────────────────────────────────
+# Stage 2 — Runtime
+#   Minimal image: only the installed packages
+#   and application source code.
+# ─────────────────────────────────────────────
+FROM --platform=linux/amd64 python:3.10-slim AS runtime
+
+WORKDIR /app
+
+# Copy installed packages from the builder stage
+COPY --from=builder /install/deps /usr/local
+
+# Copy application source (excludes whatever is in .dockerignore)
 COPY . .
 
-# Expose port 8000 for FastAPI
+# Runtime tuning for constrained environments (e.g. Render free tier 512 MB)
+ENV MALLOC_ARENA_MAX=2 \
+    PYTHONUNBUFFERED=1 \
+    TF_CPP_MIN_LOG_LEVEL=3 \
+    TF_NUM_INTEROP_THREADS=1 \
+    TF_NUM_INTRAOP_THREADS=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 EXPOSE 8000
 
-# Run the FastAPI application using Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--timeout-keep-alive", "5"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "1", "--timeout-keep-alive", "5"]
