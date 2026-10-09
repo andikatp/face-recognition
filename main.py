@@ -3,8 +3,10 @@ import os
 import traceback
 import cv2
 import numpy as np
+import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 # Suppress verbose TensorFlow logs and DeepFace deprecation warnings
@@ -12,13 +14,21 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["DEEPFACE_LOG_LEVEL"] = "40" # ERROR level only
 from deepface import DeepFace
 
+# --- CONFIGURE PROFESSIONAL LOGGING ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("LivenessAPI")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Initializes the lightweight liveness model into RAM.
     """
-    print("🤖 Booting System: Compiling Lightweight Liveness Engine...")
+    logger.info("🤖 Booting System: Compiling Lightweight Liveness Engine...")
     try:
         # Force-load liveness model weights using a blank dummy target matrix
         dummy_img = np.zeros((224, 224, 3), dtype=np.uint8)
@@ -28,20 +38,28 @@ async def lifespan(app: FastAPI):
             enforce_detection=False,
             detector_backend="opencv"
         )
-        print("✅ Liveness Engine pre-compiled successfully.")
+        logger.info("✅ Liveness Engine pre-compiled successfully.")
     except Exception as e:
-        print(f"⚠️ Initial cache warm-up notice: {str(e)}")
+        logger.warning(f"⚠️ Initial cache warm-up notice: {str(e)}")
     yield
-    print("🔌 Shutting down Liveness Engine...")
+    logger.info("🔌 Shutting down Liveness Engine...")
 
 
 app = FastAPI(title="Liveness Detection Engine", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     # Log full trace server-side only — never expose internals to clients
-    print("GLOBAL EXCEPTION:", traceback.format_exc())
+    logger.error(f"GLOBAL EXCEPTION: {traceback.format_exc()}")
     return JSONResponse(
         status_code=500,
         content={"status": "error", "message": "Terjadi kesalahan internal pada server."}
@@ -59,8 +77,7 @@ async def verify_face(
     file: UploadFile = File(...),
     threshold: float = Form(0.6)
 ):
-    print(f"\n--- 📸 New Verification Request ---")
-    print(f"🎯 Target Threshold: {threshold}")
+    logger.info(f"--- 📸 New Verification Request | Target Threshold: {threshold} ---")
     # 1. Enforce payload constraints
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid data type. Must submit a valid image format.")
@@ -88,11 +105,11 @@ async def verify_face(
     # 3.5. BRIGHTNESS CHECK & AUTO-ENHANCEMENT
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     brightness = np.mean(gray)
-    print(f"💡 Image Brightness: {brightness:.2f}")
+    logger.info(f"💡 Image Brightness: {brightness:.2f}")
 
     # 1. Graceful Rejection: If the image is extremely dark, reject it early.
     if brightness < 40:
-        print("❌ Rejected: Image is too dark (< 40)")
+        logger.warning("❌ Rejected: Image is too dark (< 40)")
         return JSONResponse(
             status_code=200,
             content={
@@ -103,7 +120,7 @@ async def verify_face(
 
     # 2. Auto-Enhancement: If it's moderately dark, enhance the contrast/brightness
     if brightness < 90:
-        print("🔧 Applying CLAHE Auto-Enhancement for low light...")
+        logger.info("🔧 Applying CLAHE Auto-Enhancement for low light...")
         # Convert to LAB color space to modify just the Lightness channel
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
@@ -115,7 +132,7 @@ async def verify_face(
         
         # Log the new brightness
         new_brightness = np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
-        print(f"✨ Enhanced Brightness: {new_brightness:.2f}")
+        logger.info(f"✨ Enhanced Brightness: {new_brightness:.2f}")
 
     try:
         # 4. LIVENESS DETECTION ONLY
@@ -140,25 +157,27 @@ async def verify_face(
         deepface_is_real = primary_face.get("is_real", False)
         deepface_score = float(primary_face.get("antispoof_score", 0.0))
         
-        print(f"🤖 DeepFace Raw Output -> is_real: {deepface_is_real}, confidence: {deepface_score:.4f}")
+        logger.info(f"🤖 DeepFace Raw Output -> is_real: {deepface_is_real}, confidence: {deepface_score:.4f}")
 
-        # Calculate a pure "realness" score (0.0 to 1.0)
-        # If deepface predicts real, its score is the realness confidence.
-        # If deepface predicts spoof, its score is the spoof confidence, so realness is 1 - score.
-        if deepface_is_real:
-            realness_score = deepface_score
+        # Calculate a pure "FAKENESS" score (0.0 to 1.0)
+        # If deepface predicts spoof, its score is the fakeness confidence.
+        # If deepface predicts real, its score is the realness confidence, so fakeness is 1 - score.
+        if not deepface_is_real:
+            fakeness_score = deepface_score
         else:
-            realness_score = 1.0 - deepface_score
+            fakeness_score = 1.0 - deepface_score
 
-        print(f"🧮 Calculated Realness Score: {realness_score:.4f}")
+        # Round to 4 decimal places to prevent ugly scientific notation (like 4.17e-7)
+        fakeness_score = round(fakeness_score, 4)
+        logger.info(f"🧮 Calculated Fakeness Score: {fakeness_score:.4f}")
 
-        # Now we apply your exact simple logic!
-        is_real = realness_score >= threshold
+        # Your exact frontend logic: If fakeness is ABOVE the threshold, it is fake.
+        is_real = fakeness_score < threshold
         
-        print(f"⚖️ Final Decision -> Accepted: {is_real} (Needed: {threshold})")
+        logger.info(f"⚖️ Final Decision -> Accepted: {is_real} (Max Fakeness Allowed: {threshold})")
         
-        # We override antispoof_score so the frontend always sees the pure "realness" percentage
-        antispoof_score = realness_score
+        # We override antispoof_score so the frontend always sees the pure "fakeness" percentage
+        antispoof_score = fakeness_score
 
         if not is_real:
             return JSONResponse(
@@ -180,14 +199,15 @@ async def verify_face(
         )
 
     except ValueError as ve:
+        logger.warning(f"Validation Error: {str(ve)}")
         return JSONResponse(status_code=200, content={"status": "rejected", "message": str(ve)})
     except Exception as e:
-        traceback.print_exc()
+        logger.error(f"Internal Error during analysis: {traceback.format_exc()}")
         return JSONResponse(status_code=500, content={"status": "error", "message": "Terjadi kesalahan internal pada server saat analisis."})
 
 
 if __name__ == "__main__":
     import uvicorn
     # This allows you to just run `python main.py` directly to start the server!
-    print("🚀 Starting local development server...")
+    logger.info("🚀 Starting local development server...")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
