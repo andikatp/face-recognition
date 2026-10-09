@@ -40,11 +40,12 @@ FROM --platform=linux/amd64 python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Install system dependencies required by OpenCV (even headless needs some)
+# Install system dependencies required by OpenCV (even headless needs some) and curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libxcb1 \
     libgl1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the virtual environment from the builder stage
