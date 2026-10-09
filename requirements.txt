@@ -1,6 +1,6 @@
 fastapi
 python-multipart
 uvicorn
-deepface
+deepface[tensorflow]
 numpy
 tensorflow-cpu

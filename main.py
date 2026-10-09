@@ -7,8 +7,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
-# Suppress verbose TensorFlow logs (also set in Dockerfile ENV, kept here as fallback)
+# Suppress verbose TensorFlow logs and DeepFace deprecation warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["DEEPFACE_LOG_LEVEL"] = "40" # ERROR level only
 from deepface import DeepFace
 
 
@@ -51,12 +52,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def root():
     """Root endpoint to check if the API is online."""
     return {"message": "Welcome to Liveness Detection Engine API", "status": "running"}
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for Render and uptime monitors."""
-    return {"status": "ok"}
 
 
 @app.post("/api/v1/verify-face")
