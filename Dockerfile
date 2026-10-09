@@ -23,7 +23,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
     sed -i '/def validate_for_keras3() -> None:/a\    return' "$PATCH_FILE" && \
     find /opt/venv -name "__pycache__" -type d -exec rm -rf {} + && \
     find /opt/venv -name "*.pyc" -delete && \
-    find /opt/venv -name "*.pyo" -delete
+    find /opt/venv -name "*.pyo" -delete && \
+    # Explicitly ensure haarcascades are exactly where DeepFace expects them
+    mkdir -p /opt/venv/lib/python3.10/site-packages/cv2/data && \
+    curl -fsSL -o /opt/venv/lib/python3.10/site-packages/cv2/data/haarcascade_frontalface_default.xml \
+         https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml && \
+    curl -fsSL -o /opt/venv/lib/python3.10/site-packages/cv2/data/haarcascade_eye.xml \
+         https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_eye.xml
 
 # ─────────────────────────────────────────────
 # Stage 2 — Runtime
