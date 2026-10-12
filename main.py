@@ -107,9 +107,9 @@ async def verify_face(
     brightness = np.mean(gray)
     logger.info(f"💡 Image Brightness: {brightness:.2f}")
 
-    # 1. Graceful Rejection: If the image is extremely dark, reject it early.
-    if brightness < 40:
-        logger.warning("❌ Rejected: Image is too dark (< 40)")
+    # 1. Graceful Rejection: Only reject early if the image is near pitch-black (< 15).
+    if brightness < 15:
+        logger.warning(f"❌ Rejected: Image is pitch black ({brightness:.2f} < 15)")
         return JSONResponse(
             status_code=200,
             content={
@@ -118,21 +118,22 @@ async def verify_face(
             }
         )
 
-    # 2. Auto-Enhancement: If it's moderately dark, enhance the contrast/brightness
+    # 2. Auto-Enhancement: If it's low light, dynamically enhance contrast/brightness with CLAHE
     if brightness < 90:
         logger.info("🔧 Applying CLAHE Auto-Enhancement for low light...")
         # Convert to LAB color space to modify just the Lightness channel
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
-        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        # Adaptive clip limit: boost contrast more for very dark/night environments (< 40)
+        clip_limit = 3.0 if brightness < 40 else 2.0
+        clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8))
         cl = clahe.apply(l)
         limg = cv2.merge((cl, a, b))
         img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
         
         # Log the new brightness
         new_brightness = np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
-        logger.info(f"✨ Enhanced Brightness: {new_brightness:.2f}")
+        logger.info(f"✨ Enhanced Brightness: {new_brightness:.2f} (clipLimit: {clip_limit})")
 
     try:
         # 4. LIVENESS DETECTION ONLY
@@ -144,7 +145,12 @@ async def verify_face(
         )
 
         if not face_objs:
-            return JSONResponse(status_code=200, content={"status": "rejected", "message": "Tidak ada wajah yang terdeteksi."})
+            msg = (
+                "Ruangan terlalu gelap atau wajah tidak terdeteksi. Silakan arahkan wajah ke cahaya layar atau tempat yang lebih terang."
+                if brightness < 40
+                else "Tidak ada wajah yang terdeteksi."
+            )
+            return JSONResponse(status_code=200, content={"status": "rejected", "message": msg})
 
         # Extract primary localized face structure
         primary_face = face_objs[0]
@@ -152,7 +158,12 @@ async def verify_face(
         # If confidence is very low, a face wasn't truly found
         confidence = primary_face.get("confidence", 0)
         if confidence < 0.5:
-            return JSONResponse(status_code=200, content={"status": "rejected", "message": "Wajah tidak terdeteksi dengan jelas."})
+            msg = (
+                "Pencahayaan terlalu redup sehingga wajah tidak terdeteksi jelas. Pastikan wajah tersorot cahaya layar/lampu."
+                if brightness < 40
+                else "Wajah tidak terdeteksi dengan jelas."
+            )
+            return JSONResponse(status_code=200, content={"status": "rejected", "message": msg})
 
         deepface_is_real = primary_face.get("is_real", False)
         deepface_score = float(primary_face.get("antispoof_score", 0.0))

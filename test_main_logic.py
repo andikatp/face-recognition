@@ -16,8 +16,8 @@ gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 brightness = np.mean(gray)
 print(f"Brightness: {brightness}")
 
-if brightness < 40:
-    print("Rejected < 40")
+if brightness < 15:
+    print("Rejected < 15 (Pitch black)")
 
 if brightness < 90:
     print("CLAHE Applied")
