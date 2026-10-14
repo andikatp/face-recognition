@@ -1,3 +1,4 @@
+import time
 from typing import Annotated
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
@@ -28,6 +29,7 @@ async def verify_face(
     file: Annotated[UploadFile, File(..., description="Selfie / face photo to verify")],
     threshold: Annotated[float, Form(description="Anti-spoofing fakeness threshold (0.0 to 1.0)")] = 0.6,
 ):
+    start_time = time.time()
     logger.info(f"--- 📸 New Verification Request | Target Threshold: {threshold} ---")
 
     # 1. Enforce payload constraints
@@ -61,7 +63,10 @@ async def verify_face(
     # 5. Execute liveness detection & antispoofing
     try:
         is_success, message, antispoof_score = evaluate_liveness(img, brightness, threshold)
+        elapsed_ms = (time.time() - start_time) * 1000
         status_str = "success" if is_success else "rejected"
+        logger.info(f"⏱️ Completed in {elapsed_ms:.1f}ms | Outcome: {status_str}")
+
         response_payload = {"status": status_str, "message": message}
         if antispoof_score is not None:
             response_payload["antispoof_score"] = antispoof_score
