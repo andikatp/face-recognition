@@ -7,8 +7,7 @@ from app.schemas import VerifyResponse, ErrorResponse
 from app.services.image_service import (
     decode_image_bytes,
     downscale_image,
-    apply_mild_deblur_if_soft,
-    check_and_enhance_lighting,
+    preprocess_image,
 )
 from app.services.liveness_service import evaluate_liveness
 
@@ -44,12 +43,9 @@ async def verify_face(
     if img is None:
         raise HTTPException(status_code=400, detail="Invalid image payload. Could not decode bytes.")
 
-    # 3. Downscale massive camera captures & restore edges if soft
+    # 3. Downscale massive camera captures & preprocess lighting
     img = downscale_image(img)
-    img = apply_mild_deblur_if_soft(img)
-
-    # 4. Check brightness & enhance lighting
-    img, brightness = check_and_enhance_lighting(img)
+    img, brightness = preprocess_image(img)
 
     # Early rejection for pitch black frames (< 15)
     if brightness < 15:

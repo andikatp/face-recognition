@@ -1,19 +1,16 @@
-import gc
 from typing import Tuple, Optional
 import cv2
 import numpy as np
 
-from app.config import logger, MAX_DIMENSION, BLUR_VARIANCE_THRESHOLD
+from app.config import logger, MAX_DIMENSION
 
 
 def decode_image_bytes(file_bytes: bytes) -> Optional[np.ndarray]:
     """
-    Decodes raw image bytes to an OpenCV BGR numpy array and frees the raw buffer.
+    Decodes raw image bytes to an OpenCV BGR numpy array.
     """
     nparr = np.frombuffer(file_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    del nparr, file_bytes
-    gc.collect()
     return img
 
 
@@ -28,25 +25,11 @@ def downscale_image(img: np.ndarray, max_dim: int = MAX_DIMENSION) -> np.ndarray
     return img
 
 
-def apply_mild_deblur_if_soft(img: np.ndarray, threshold: float = BLUR_VARIANCE_THRESHOLD) -> np.ndarray:
+def preprocess_image(img: np.ndarray) -> Tuple[np.ndarray, float]:
     """
-    Computes Laplacian variance. If the camera capture is soft or slightly motion-blurred,
-    applies a mild unsharp mask to restore edge contrast for face detection.
-    """
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur_variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    logger.info(f"🔍 Sharpness (Laplacian variance): {blur_variance:.2f}")
-
-    if blur_variance < threshold:
-        logger.info("🔧 Applying mild deblur for soft camera frame...")
-        soft = cv2.GaussianBlur(img, (0, 0), 1.2)
-        return cv2.addWeighted(img, 1.5, soft, -0.5, 0)
-    return img
-
-
-def check_and_enhance_lighting(img: np.ndarray) -> Tuple[np.ndarray, float]:
-    """
-    Computes brightness and applies CLAHE contrast enhancement for low-light scenes (< 90).
+    Combined preprocessing: computes brightness and applies CLAHE only for genuinely
+    dark scenes (< 45). Skips deblur — MiniFASNet doesn't benefit from sharpened edges
+    and preserving raw camera texture reduces false spoofing rejections.
     Returns the processed image and the original measured brightness.
     """
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

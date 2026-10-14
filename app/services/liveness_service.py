@@ -17,6 +17,9 @@ def warmup_liveness_model() -> None:
             anti_spoofing=True,
             enforce_detection=False,
             detector_backend=DETECTOR_BACKEND,
+            align=False,
+            expand_percentage=0,
+            normalize_face=False,
         )
         logger.info("✅ Liveness Engine pre-compiled successfully.")
     except Exception as exc:
@@ -78,8 +81,9 @@ def evaluate_liveness(img: np.ndarray, brightness: float, threshold: float = 0.6
         anti_spoofing=True,
         enforce_detection=False,
         detector_backend=DETECTOR_BACKEND,
-        align=True,
-        expand_percentage=20,
+        align=False,
+        expand_percentage=0,
+        normalize_face=False,
     )
 
     if not face_objs:
