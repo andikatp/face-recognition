@@ -15,10 +15,10 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Upgrade pip, install everything, then patch DeepFace
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --default-timeout=1000 -r requirements.txt && \
+RUN pip install --no-cache-dir --only-binary :all: "pip==25.0.1" && \
+    pip install --no-cache-dir --only-binary :all: --default-timeout=1000 -r requirements.txt && \
     pip uninstall -y opencv-python && \
-    pip install --no-cache-dir "opencv-python-headless<5.0.0" && \
+    pip install --no-cache-dir --only-binary :all: "opencv-python-headless==4.10.0.84" && \
     LOCATION=$(pip show --path deepface 2>/dev/null | head -1 || \
                python -c "import deepface, os; print(os.path.dirname(deepface.__file__) + '/..')") && \
     PATCH_FILE=$(find /opt/venv -path "*/deepface/commons/package_utils.py" | head -1) && \
