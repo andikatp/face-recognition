@@ -6,6 +6,7 @@ __pycache__/
 *.pyo
 *.pkl
 employee_db/
+dummy/
 .env
 .DS_Store
 *.md

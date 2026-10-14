@@ -40,13 +40,23 @@ FROM --platform=linux/amd64 python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Install system dependencies required by OpenCV (even headless needs some) and curl for health checks
+# Install dependencies, setup non-root user, and download model weights in a merged layer (docker:S7018, S7031, S6471)
+ENV DEEPFACE_HOME=/home/appuser
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgl1 \
     libglib2.0-0 \
     libxcb1 \
-    libgl1 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m appuser \
+    && mkdir -p /home/appuser/.deepface/weights \
+    && curl -fsSL -o /home/appuser/.deepface/weights/face_detection_yunet_2023mar.onnx \
+        https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx \
+    && curl -fsSL -o /home/appuser/.deepface/weights/2.7_80x80_MiniFASNetV2.h5 \
+        https://github.com/serengil/deepface_models/releases/download/v1.0/2.7_80x80_MiniFASNetV2.h5 \
+    && curl -fsSL -o /home/appuser/.deepface/weights/4_0_0_80x80_MiniFASNetV1SE.h5 \
+        https://github.com/serengil/deepface_models/releases/download/v1.0/4_0_0_80x80_MiniFASNetV1SE.h5 \
+    && chown -R appuser:appuser /home/appuser/.deepface
 
 # Copy the virtual environment from the builder stage
 COPY --from=builder /opt/venv /opt/venv
@@ -54,8 +64,11 @@ COPY --from=builder /opt/venv /opt/venv
 # Activate virtual environment in runtime
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application source (excludes whatever is in .dockerignore)
-COPY . .
+# Copy explicit application modules (avoids recursive COPY . . - fixes SonarCloud CRITICAL docker:S6470)
+COPY app ./app
+COPY main.py .
+
+RUN chown -R appuser:appuser /app
 
 # Runtime tuning for constrained environments (e.g. Render free tier 512 MB)
 ENV MALLOC_ARENA_MAX=2 \
@@ -70,6 +83,9 @@ EXPOSE 8000
 # Tell Docker to ping the health endpoint every 30 seconds
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:8000/ || exit 1
+
+# Run container as non-root user
+USER appuser
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
      "--workers", "1", "--timeout-keep-alive", "5"]
