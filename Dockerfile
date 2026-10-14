@@ -50,11 +50,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m appuser \
     && mkdir -p /home/appuser/.deepface/weights \
-    && curl -fsSL -o /home/appuser/.deepface/weights/face_detection_yunet_2023mar.onnx \
+    && curl --proto "=https" --tlsv1.2 -fsSL -o /home/appuser/.deepface/weights/face_detection_yunet_2023mar.onnx \
         https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx \
-    && curl -fsSL -o /home/appuser/.deepface/weights/2.7_80x80_MiniFASNetV2.h5 \
+    && curl --proto "=https" --tlsv1.2 -fsSL -o /home/appuser/.deepface/weights/2.7_80x80_MiniFASNetV2.h5 \
         https://github.com/serengil/deepface_models/releases/download/v1.0/2.7_80x80_MiniFASNetV2.h5 \
-    && curl -fsSL -o /home/appuser/.deepface/weights/4_0_0_80x80_MiniFASNetV1SE.h5 \
+    && curl --proto "=https" --tlsv1.2 -fsSL -o /home/appuser/.deepface/weights/4_0_0_80x80_MiniFASNetV1SE.h5 \
         https://github.com/serengil/deepface_models/releases/download/v1.0/4_0_0_80x80_MiniFASNetV1SE.h5 \
     && chown -R appuser:appuser /home/appuser/.deepface
 
