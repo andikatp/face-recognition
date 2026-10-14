@@ -53,11 +53,11 @@ def check_and_enhance_lighting(img: np.ndarray) -> Tuple[np.ndarray, float]:
     brightness = float(np.mean(gray))
     logger.info(f"💡 Image Brightness: {brightness:.2f}")
 
-    if 15 <= brightness < 90:
+    if 15 <= brightness < 45:
         logger.info("🔧 Applying CLAHE Auto-Enhancement for low light...")
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
-        clip_limit = 3.0 if brightness < 40 else 2.0
+        clip_limit = 3.0 if brightness < 30 else 2.0
         clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8))
         cl = clahe.apply(l)
         limg = cv2.merge((cl, a, b))
