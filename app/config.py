@@ -16,6 +16,7 @@ logging.basicConfig(
 logger = logging.getLogger("LivenessAPI")
 
 # --- CORE TUNING CONSTANTS ---
+APP_VERSION: str = os.getenv("APP_VERSION", "1.0.1")
 # YuNet is more robust than Haar for off-center / slightly blurry faces.
 DETECTOR_BACKEND: str = os.getenv("DETECTOR_BACKEND", "yunet")
 MAX_DIMENSION: int = int(os.getenv("MAX_DIMENSION", "640"))
