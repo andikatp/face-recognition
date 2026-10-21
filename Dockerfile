@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir --only-binary :all: "pip==25.0.1" && \
         "uvicorn==0.54.0" \
         "deepface[tensorflow]==0.0.102" \
         "numpy==2.5.4" \
-        "tensorflow-cpu==2.21.0" && \
+        "tensorflow-cpu==2.21.0" \
+        "redis==5.2.1" && \
     pip uninstall -y opencv-python && \
     pip install --no-cache-dir --only-binary :all: "opencv-python-headless==4.10.0.84" && \
     LOCATION=$(pip show --path deepface 2>/dev/null | head -1 || \

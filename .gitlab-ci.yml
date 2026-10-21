@@ -1,0 +1,35 @@
+stages:
+  - build
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+
+build-and-push:
+  stage: build
+  tags:
+    - build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  before_script:
+    # Login otomatis menggunakan predefined variable bawaan GitLab CI
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    # Setup docker buildx
+    - docker buildx create --use --name mybuilder
+  script:
+    - |
+      docker buildx build \
+        --platform linux/amd64 \
+        --target runtime \
+        --cache-from type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache \
+        --cache-to type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache,mode=max \
+        --tag ${CI_REGISTRY_IMAGE}:latest \
+        --tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} \
+        --tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG} \
+        --push \
+        .

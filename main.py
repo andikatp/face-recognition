@@ -5,17 +5,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import logger, APP_VERSION
 from app.services.liveness_service import warmup_liveness_model
+from app.services.redis_service import init_redis, close_redis
 from app.api.v1.endpoints import router as api_v1_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Initializes the lightweight liveness model into RAM on server boot.
+    Initializes the lightweight liveness model and Redis client on boot.
     """
     logger.info(f"🚀 Booting Liveness Detection Engine v{APP_VERSION} ...")
     warmup_liveness_model()
+    await init_redis()
     yield
+    await close_redis()
     logger.info("🔌 Shutting down Liveness Engine...")
 
 
