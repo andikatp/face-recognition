@@ -5,31 +5,49 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: "/certs"
 
-build-and-push:
+.build_template:
   stage: build
   tags:
     - build
   image: docker:24.0.5
   services:
     - docker:24.0.5-dind
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_COMMIT_BRANCH == "stage"'
-    - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script:
-    # Login otomatis menggunakan predefined variable bawaan GitLab CI
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    # Setup docker buildx
     - docker buildx create --use --name mybuilder
+
+# 1. Pipeline untuk Server DEV (Trigger otomatis saat push/merge ke 'stage')
+build-stage:
+  extends: .build_template
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "stage"'
   script:
     - |
       docker buildx build \
         --platform linux/amd64 \
         --target runtime \
-        --cache-from type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache \
-        --cache-to type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache,mode=max \
+        --cache-from type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache-stage \
+        --cache-to type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache-stage,mode=max \
+        --tag ${CI_REGISTRY_IMAGE}:stage \
+        --tag ${CI_REGISTRY_IMAGE}:stage-${CI_COMMIT_SHORT_SHA} \
+        --push \
+        .
+
+# 2. Pipeline untuk Server PROD (Trigger otomatis saat push/merge ke 'main')
+build-prod:
+  extends: .build_template
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "main"'
+  script:
+    - |
+      docker buildx build \
+        --platform linux/amd64 \
+        --target runtime \
+        --cache-from type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache-prod \
+        --cache-to type=registry,ref=${CI_REGISTRY_IMAGE}:buildcache-prod,mode=max \
         --tag ${CI_REGISTRY_IMAGE}:latest \
-        --tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} \
-        --tag ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG} \
+        --tag ${CI_REGISTRY_IMAGE}:prod-${CI_COMMIT_SHORT_SHA} \
         --push \
         .
