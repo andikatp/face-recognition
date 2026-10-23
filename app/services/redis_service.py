@@ -1,4 +1,5 @@
 import redis.asyncio as aioredis
+
 from app.config import REDIS_URL, logger
 
 # Global asynchronous redis client instance
@@ -6,8 +7,12 @@ redis_client: aioredis.Redis | None = None
 
 
 async def init_redis() -> None:
-    """Initialize Redis connection pool."""
+    """Initialize Redis connection pool if REDIS_URL is configured."""
     global redis_client
+    if not REDIS_URL:
+        logger.info("ℹ️ REDIS_URL is not set. Running in offline/standalone mode without Redis.")
+        return
+
     try:
         redis_client = aioredis.from_url(
             REDIS_URL,

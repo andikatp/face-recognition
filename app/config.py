@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 # Suppress verbose TensorFlow logs and DeepFace deprecation warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -24,4 +24,26 @@ MIN_FACE_CONFIDENCE: float = float(os.getenv("MIN_FACE_CONFIDENCE", "0.35"))
 MAX_PAYLOAD_BYTES: int = 5 * 1024 * 1024  # 5MB
 
 # --- REDIS CONFIGURATION ---
-REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# Optional: Leave unset or empty for offline development without Redis/Auth
+REDIS_URL: str = os.getenv("REDIS_URL", "").strip()
+
+
+# --- ENVIRONMENT & CORS CONFIGURATION ---
+ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
+# Comma-separated list of allowed origins, or '*' for local development
+ALLOWED_ORIGINS: list[str] = [
+    origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",") if origin.strip()
+]
+
+# --- JWT AUTHENTICATION CONFIGURATION ---
+JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "change-me-in-production-secret-key")
+JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+# Check Redis for token blacklist/revocation or active session key
+JWT_CHECK_REDIS: bool = os.getenv("JWT_CHECK_REDIS", "true").lower() in ("true", "1", "yes")
+# Redis key prefix for revoked tokens or active sessions (e.g. "blacklist:<jti>" or "session:<user_id>")
+JWT_REDIS_BLACKLIST_PREFIX: str = os.getenv("JWT_REDIS_BLACKLIST_PREFIX", "jwt:blacklist:")
+
+if ENVIRONMENT == "production" and JWT_SECRET_KEY == "change-me-in-production-secret-key":
+    logger.critical(
+        "🚨 CRITICAL SECURITY WARNING: Running in production with default JWT_SECRET_KEY!"
+    )
