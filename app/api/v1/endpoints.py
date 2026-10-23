@@ -1,10 +1,12 @@
 import time
 from typing import Annotated
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.config import logger, MAX_PAYLOAD_BYTES
-from app.schemas import VerifyResponse, ErrorResponse
+from app.config import MAX_PAYLOAD_BYTES, logger
+from app.dependencies.auth import get_current_user_token
+from app.schemas import ErrorResponse, VerifyResponse
 from app.services.image_service import (
     decode_image_bytes,
     downscale_image,
@@ -20,21 +22,30 @@ router = APIRouter(prefix="/api/v1", tags=["Verification"])
     response_model=VerifyResponse,
     responses={
         200: {"model": VerifyResponse, "description": "Verification outcome (success or rejected)"},
-        400: {"model": ErrorResponse, "description": "Invalid input format or unreadable image bytes"},
+        400: {
+            "model": ErrorResponse,
+            "description": "Invalid input format or unreadable image bytes",
+        },
+        401: {"model": ErrorResponse, "description": "Unauthorized - Missing or invalid JWT token"},
         413: {"model": ErrorResponse, "description": "Payload size exceeds 5MB limit"},
         500: {"model": ErrorResponse, "description": "Internal server error during analysis"},
     },
 )
 async def verify_face(
     file: Annotated[UploadFile, File(..., description="Selfie / face photo to verify")],
-    threshold: Annotated[float, Form(description="Anti-spoofing fakeness threshold (0.0 to 1.0)")] = 0.6,
+    threshold: Annotated[
+        float, Form(description="Anti-spoofing fakeness threshold (0.0 to 1.0)")
+    ] = 0.6,
+    current_user: Annotated[dict, Depends(get_current_user_token)] = None,
 ):
     start_time = time.time()
     logger.info(f"--- 📸 New Verification Request | Target Threshold: {threshold} ---")
 
     # 1. Enforce payload constraints
     if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Invalid data type. Must submit a valid image format.")
+        raise HTTPException(
+            status_code=400, detail="Invalid data type. Must submit a valid image format."
+        )
 
     file_bytes = await file.read()
     if len(file_bytes) > MAX_PAYLOAD_BYTES:
@@ -43,7 +54,9 @@ async def verify_face(
     # 2. Decode raw bytes to OpenCV image matrix
     img = decode_image_bytes(file_bytes)
     if img is None:
-        raise HTTPException(status_code=400, detail="Invalid image payload. Could not decode bytes.")
+        raise HTTPException(
+            status_code=400, detail="Invalid image payload. Could not decode bytes."
+        )
 
     # 3. Downscale massive camera captures & preprocess lighting
     img = downscale_image(img)
@@ -75,10 +88,15 @@ async def verify_face(
 
     except ValueError as val_err:
         logger.warning(f"Validation notice during analysis: {val_err}")
-        return JSONResponse(status_code=200, content={"status": "rejected", "message": str(val_err)})
+        return JSONResponse(
+            status_code=200, content={"status": "rejected", "message": str(val_err)}
+        )
     except Exception:
         logger.exception("Internal error occurred during liveness analysis")
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "message": "Terjadi kesalahan internal pada server saat analisis."},
+            content={
+                "status": "error",
+                "message": "Terjadi kesalahan internal pada server saat analisis.",
+            },
         )

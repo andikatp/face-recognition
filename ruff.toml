@@ -1,0 +1,20 @@
+# Ruff configuration file
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+    "B008", # do not perform function call in argument defaults (standard pattern for FastAPI Depends)
+]
+
+[lint.per-file-ignores]
+"test_*.py" = ["F401", "F841"]

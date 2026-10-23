@@ -1,10 +1,9 @@
-from typing import Tuple, Optional
 import numpy as np
 import tensorflow as tf
 from deepface import DeepFace
 from deepface.modules import modeling
 
-from app.config import logger, DETECTOR_BACKEND, MIN_FACE_CONFIDENCE
+from app.config import DETECTOR_BACKEND, MIN_FACE_CONFIDENCE, logger
 
 
 def warmup_liveness_model() -> None:
@@ -33,7 +32,7 @@ def warmup_liveness_model() -> None:
         logger.warning(f"⚠️ Initial cache warm-up notice: {exc}")
 
 
-def _check_detection_quality(primary_face: dict, img_shape: tuple, brightness: float) -> Optional[str]:
+def _check_detection_quality(primary_face: dict, img_shape: tuple, brightness: float) -> str | None:
     """
     Checks if a face was genuinely detected by the detector or fell back to full-frame dummy area.
     Returns an error message if invalid, or None if detection passed.
@@ -65,7 +64,9 @@ def _calculate_fakeness_score(primary_face: dict) -> float:
     """
     deepface_is_real = primary_face.get("is_real", False)
     deepface_score = float(primary_face.get("antispoof_score", 0.0))
-    logger.info(f"🤖 DeepFace Raw Output -> is_real: {deepface_is_real}, confidence: {deepface_score:.4f}")
+    logger.info(
+        f"🤖 DeepFace Raw Output -> is_real: {deepface_is_real}, confidence: {deepface_score:.4f}"
+    )
 
     if not deepface_is_real:
         fakeness_score = deepface_score
@@ -77,7 +78,9 @@ def _calculate_fakeness_score(primary_face: dict) -> float:
     return fakeness_score
 
 
-def evaluate_liveness(img: np.ndarray, brightness: float, threshold: float = 0.6) -> Tuple[bool, str, Optional[float]]:
+def evaluate_liveness(
+    img: np.ndarray, brightness: float, threshold: float = 0.6
+) -> tuple[bool, str, float | None]:
     """
     Runs face extraction and anti-spoofing on the pre-processed image.
     Returns:
@@ -94,7 +97,11 @@ def evaluate_liveness(img: np.ndarray, brightness: float, threshold: float = 0.6
 
     if not face_objs:
         if brightness < 40:
-            return False, "Ruangan terlalu gelap atau wajah tidak terdeteksi. Silakan arahkan wajah ke cahaya layar atau tempat yang lebih terang.", None
+            return (
+                False,
+                "Ruangan terlalu gelap atau wajah tidak terdeteksi. Silakan arahkan wajah ke cahaya layar atau tempat yang lebih terang.",
+                None,
+            )
         return False, "Tidak ada wajah yang terdeteksi.", None
 
     primary_face = face_objs[0]

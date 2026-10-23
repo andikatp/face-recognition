@@ -3,7 +3,7 @@ from app.services.image_service import (
     downscale_image,
     preprocess_image,
 )
-from app.services.liveness_service import warmup_liveness_model, evaluate_liveness
+from app.services.liveness_service import evaluate_liveness, warmup_liveness_model
 
 __all__ = [
     "decode_image_bytes",

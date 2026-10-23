@@ -25,22 +25,19 @@ print(f"Original Brightness: {brightness}")
 if brightness < 90:
     print("Applying CLAHE...")
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
+    l_channel, a, b = cv2.split(lab)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    cl = clahe.apply(l)
+    cl = clahe.apply(l_channel)
     limg = cv2.merge((cl, a, b))
     img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
-    
+
     gray_new = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     new_brightness = np.mean(gray_new)
     print(f"New Brightness: {new_brightness}")
 
 try:
     face_objs = DeepFace.extract_faces(
-        img_path=img,
-        anti_spoofing=True,
-        enforce_detection=False,
-        detector_backend="opencv"
+        img_path=img, anti_spoofing=True, enforce_detection=False, detector_backend="opencv"
     )
 
     if not face_objs:
@@ -59,4 +56,3 @@ try:
 
 except Exception as e:
     print(f"Error: {e}")
-

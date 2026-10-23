@@ -22,17 +22,14 @@ if brightness < 15:
 if brightness < 90:
     print("CLAHE Applied")
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
+    l_channel, a, b = cv2.split(lab)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    cl = clahe.apply(l)
+    cl = clahe.apply(l_channel)
     limg = cv2.merge((cl, a, b))
     img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
 
 face_objs = DeepFace.extract_faces(
-    img_path=img,
-    anti_spoofing=True,
-    enforce_detection=False,
-    detector_backend="opencv"
+    img_path=img, anti_spoofing=True, enforce_detection=False, detector_backend="opencv"
 )
 
 primary_face = face_objs[0]

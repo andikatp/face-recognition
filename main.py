@@ -1,21 +1,26 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import logger, APP_VERSION
-from app.services.liveness_service import warmup_liveness_model
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from app.api.v1.endpoints import router as api_v1_router
+from app.config import ALLOWED_ORIGINS, APP_VERSION, logger
+from app.middlewares.auth import JWTAuthMiddleware
+from app.services.liveness_service import warmup_liveness_model
+from app.services.redis_service import close_redis, init_redis
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Initializes the lightweight liveness model into RAM on server boot.
+    Initializes the lightweight liveness model and Redis client on boot.
     """
     logger.info(f"🚀 Booting Liveness Detection Engine v{APP_VERSION} ...")
     warmup_liveness_model()
+    await init_redis()
     yield
+    await close_redis()
     logger.info("🔌 Shutting down Liveness Engine...")
 
 
@@ -25,11 +30,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Authentication middleware (runs on all non-exempt routes)
+app.add_middleware(JWTAuthMiddleware)
+
+# CORS middleware (securely parameterized from environment)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=ALLOWED_ORIGINS != ["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
